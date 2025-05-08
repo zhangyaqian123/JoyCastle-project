@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <title>随机颜色矩阵生成器</title>
+        <style>
+            body {
+                font-size: 16px;
+                margin: 30px;
+            }
+            .header {
+                margin-bottom: 30px;
+                display: flex;
+                flex-direction: column;
+                gap: 30px;
+            }
+            .colors {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            .color-cell {
+                border-radius: 4px;
+                display: inline-block;
+                width: 28px;
+                height: 28px;
+            }
+
+            .inputs {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .inputs input {
+                width: 60px;
+                padding: 4px 8px;
+                border-radius: 4px;
+                border: 1px solid #bbb;
+                margin-left: 8px;
+            }
+
+            .ok-btn {
+                background: green;
+                color: #fff;
+                width: 200px;
+                height: 40px;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                margin-top: 10px;
+            }
+            .matrix {
+                margin-top: 40px;
+                display: grid;
+                grid-template-columns: repeat(10, 32px);
+                grid-template-rows: repeat(10, 32px);
+                gap: 2px;
+                justify-content: start;
+            }
+            .color-red {
+                background: red;
+            }
+            .color-green {
+                background: green;
+            }
+            .color-blue {
+                background: blue;
+            }
+            .color-yellow {
+                background: yellow;
+            }
+            .color-orange {
+                background: orange;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>随机颜色矩阵生成器</h1>
+        <h3>本程序生成一个10×10的随机颜色矩阵，颜色选择基于概率规则。</h3>
+        <div class="header">
+            <div class="colors">
+                <span>颜色：</span>
+                <span class="color-cell color-red"></span>
+                红色
+                <span class="color-cell color-green"></span>
+                绿色
+                <span class="color-cell color-blue"></span>
+                蓝色
+                <span class="color-cell color-yellow"></span>
+                黄色
+                <span class="color-cell color-orange"></span>
+                橙色
+            </div>
+            <div class="inputs">
+                <label>
+                    X值 (%)：
+                    <input id="input-x" type="number" value="10" min="0" max="100" />
+                </label>
+                <label>
+                    Y值 (%)：
+                    <input id="input-y" type="number" value="10" min="0" max="100" />
+                </label>
+                <label>
+                    Z值 (%)：
+                    <input id="input-z" type="number" value="20" min="0" max="100" />
+                </label>
+            </div>
+            <button class="ok-btn" onclick="btnClick()">生成矩阵</button>
+        </div>
+        <div id="matrix" class="matrix"></div>
+        <script>
+            const MATRIX_SIZE = 10;
+            // 颜色定义
+            const COLORS = [
+                { name: '红色', class: 'color-red' },
+                { name: '绿色', class: 'color-green' },
+                { name: '蓝色', class: 'color-blue' },
+                { name: '黄色', class: 'color-yellow' },
+                { name: '橙色', class: 'color-orange' }
+            ];
+
+
+            function btnClick() {
+                const x = parseFloat(document.getElementById('input-x').value) || 0;
+                const y = parseFloat(document.getElementById('input-y').value) || 0;
+                const z = parseFloat(document.getElementById('input-z').value) || 0;
+                if (x < 0 || y < 0 || z < 0) {
+                    alert('X、Y、Z值不能为负数！, 修改后重试');
+                    return;
+                }
+                const matrix = buildMatrix(x, y, z);
+                renderMatrix(matrix);
+            }
+            // 生成矩阵主逻辑
+            function buildMatrix(x, y, z) {
+                // 空数组
+                const matrix = new Array(MATRIX_SIZE).fill(0).map(() => new Array(MATRIX_SIZE).fill(0));
+
+                // (0,0) 随机
+                matrix[0][0] = Math.floor(Math.random() * 5);
+
+                for (let i = 0; i < MATRIX_SIZE; i++) {
+                    for (let j = 0; j < MATRIX_SIZE; j++) {
+                        if (i === 0 && j === 0) continue;
+                        // 初识颜色的概率都是0.2；
+                        let base = new Array(5).fill(1 / 5);
+                        // 左邻居
+                        const left = j === 0 ? null : matrix[i][j - 1];
+
+                        // 上邻居
+                        const top = i === 0 ? null : matrix[i - 1][j];
+
+                        // 根据邻居改变概率
+                        if (left) {
+                            base[left] += x / 100;
+                        }
+                        if (top) {
+                            base[top] += y / 100;
+                        }
+                        if (left === top) {
+                            base[left] += z / 100;
+                        }
+
+                        // 归一化
+                        const total = base.reduce((a, b) => a + b, 0);
+                        base = base.map(e => e / total);
+
+                        // 获取随机位置
+                        const random = Math.random();
+                        let cur = 0;
+                        for (let k = 0; k < 5; k++) {
+                            cur += base[k];
+                            if (random < cur) {
+                                matrix[i][j] = k;
+                                break;
+                            }
+                        }
+                    }
+                }
+                return matrix;
+            }
+
+            // 渲染矩阵
+            function renderMatrix(matrix) {
+                const matrixDiv = document.getElementById('matrix');
+                matrixDiv.innerHTML = '';
+                const len = matrix.length;
+                for (let i = 0; i < len; i++) {
+                    for (let j = 0; j < len; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'color-cell ' + COLORS[matrix[i][j]].class;
+                        matrixDiv.appendChild(cell);
+                    }
+                }
+            }
+
+
+            // 概率归一化单元测试
+            function test() {
+                testSameNeighbor();
+                testdiffNeighbor();
+            }
+            function testSameNeighbor() {
+                // 1. 模拟不同邻居情况
+                const x = 10,
+                    y = 10,
+                    z = 20;
+                let base = new Array(5).fill(1 / 5);
+                // 左邻居
+                const left = 2;
+                // 上邻居
+                const top = 2;
+                // 根据邻居改变概率
+                base[left] += x / 100;
+                base[top] += y / 100;
+                if (left === top) {
+                    base[left] += z / 100;
+                }
+                // 归一化
+                const total = base.reduce((a, b) => a + b, 0);
+                base = base.map(e => e / total);
+                const sum = base.reduce((a, b) => a + b, 0);
+                console.log(sum);
+                if (Math.abs(sum - 1) < 1e-6) {
+                    console.error('概率归一化成功');
+                } else {
+                    console.log('概率归一化失败');
+                }
+            }
+            function testdiffNeighbor() {
+                // 1. 模拟不同邻居情况
+                const x = 10,
+                    y = 10,
+                    z = 20;
+                let base = new Array(5).fill(1 / 5);
+                // 左邻居
+                const left = 2;
+                // 上邻居
+                const top = 3;
+                // 根据邻居改变概率
+                base[left] += x / 100;
+                base[top] += y / 100;
+                if (left === top) {
+                    base[left] += z / 100;
+                }
+                // 归一化
+                const total = base.reduce((a, b) => a + b, 0);
+                base = base.map(e => e / total);
+                const sum = base.reduce((a, b) => a + b, 0);
+                console.log(sum);
+                if (Math.abs(sum - 1) < 1e-6) {
+                    console.error('概率归一化成功');
+                } else {
+                    console.log('概率归一化失败');
+                }
+            }
+            test();
+        </script>
+    </body>
+</html>
