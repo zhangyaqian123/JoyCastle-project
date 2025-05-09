@@ -120,15 +120,20 @@
                 { name: '橙色', class: 'color-orange' }
             ];
 
+            /**
+             * 限制概率值在[0,1]范围内
+             * @param {number} value 需要限制的概率值
+             * @returns {number} 限制后的概率值
+             */
+            function formatBase(value) {
+                return Math.min(Math.max(value, 0), 1);
+            }
 
             function btnClick() {
                 const x = parseFloat(document.getElementById('input-x').value) || 0;
                 const y = parseFloat(document.getElementById('input-y').value) || 0;
                 const z = parseFloat(document.getElementById('input-z').value) || 0;
-                if (x < 0 || y < 0 || z < 0) {
-                    alert('X、Y、Z值不能为负数！, 修改后重试');
-                    return;
-                }
+
                 const matrix = buildMatrix(x, y, z);
                 renderMatrix(matrix);
             }
@@ -152,30 +157,49 @@
                         const top = i === 0 ? null : matrix[i - 1][j];
 
                         // 根据邻居改变概率
-                        if (left) {
-                            base[left] += x / 100;
-                        }
-                        if (top) {
-                            base[top] += y / 100;
-                        }
-                        if (left === top) {
-                            base[left] += z / 100;
+                        // 1. 左、上邻居相同
+                        if (left != null && top != null && left === top) {
+                            base[left] += (x + y + z) / 100;
+                            base[left] = formatBase(base[left]);
+                            // 剩余概率
+                            const remain = (1 - base[left]) / 4;
+                            base = base.map((e, _i) => (_i !== left ? remain : e));
+                        } else {
+                            // 2. 左、上邻居不同
+                            let changeSum = 0;
+                            if (left !== null) {
+                                base[left] += x / 100;
+                                base[left] = formatBase(base[left]);
+                                changeSum += base[left];
+                            }
+                            if (top !== null) {
+                                base[top] += y / 100;
+                                base[top] = formatBase(base[top]);
+                                changeSum += base[top];
+                            }
+                            // 剩余概率
+                            changeSum = formatBase(changeSum);
+                            const remain = (1 - changeSum) / 3;
+                            base = base.map((e, _i) => (_i !== left && _i !== top ? remain : e));
                         }
 
-                        // 归一化
+                        // 归一化，除去浮点数误差
                         const total = base.reduce((a, b) => a + b, 0);
                         base = base.map(e => e / total);
 
-                        // 获取随机位置
+                        // 获取随机概率
                         const random = Math.random();
+                        // 默认颜色
+                        let index = 4;
                         let cur = 0;
                         for (let k = 0; k < 5; k++) {
                             cur += base[k];
-                            if (random < cur) {
-                                matrix[i][j] = k;
+                            if (random < cur + 1e-10) {
+                                index = k;
                                 break;
                             }
                         }
+                        matrix[i][j] = index;
                     }
                 }
                 return matrix;
@@ -195,7 +219,6 @@
                 }
             }
 
-
             // 概率归一化单元测试
             function test() {
                 testSameNeighbor();
@@ -203,57 +226,69 @@
             }
             function testSameNeighbor() {
                 // 1. 模拟不同邻居情况
-                const x = 10,
-                    y = 10,
+                let x = 100,
+                    y = -100,
+                    z = 0;
+                // 左邻居
+                let left = 2;
+                // 上邻居
+                let top = 1;
+                testProbability(left, top, x, y, z, '0,0,1,0,0');
+
+                // 概率超过1
+                (x = 50), (y = 50), (z = 10);
+                // 左邻居
+                left = 2;
+                // 上邻居
+                top = 1;
+                testProbability(left, top, x, y, z, '0,0.5,0.5,0,0');
+            }
+            function testdiffNeighbor() {
+                // 1. 模拟不同邻居情况
+                const x = 50,
+                    y = 30,
                     z = 20;
-                let base = new Array(5).fill(1 / 5);
                 // 左邻居
                 const left = 2;
                 // 上邻居
                 const top = 2;
-                // 根据邻居改变概率
-                base[left] += x / 100;
-                base[top] += y / 100;
-                if (left === top) {
-                    base[left] += z / 100;
-                }
-                // 归一化
-                const total = base.reduce((a, b) => a + b, 0);
-                base = base.map(e => e / total);
-                const sum = base.reduce((a, b) => a + b, 0);
-                console.log(sum);
-                if (Math.abs(sum - 1) < 1e-6) {
-                    console.error('概率归一化成功');
-                } else {
-                    console.log('概率归一化失败');
-                }
+                testProbability(left, top, x, y, z, '0,0,1,0,0');
             }
-            function testdiffNeighbor() {
-                // 1. 模拟不同邻居情况
-                const x = 10,
-                    y = 10,
-                    z = 20;
+
+            function testProbability(left, top, x, y, z, expect) {
                 let base = new Array(5).fill(1 / 5);
-                // 左邻居
-                const left = 2;
-                // 上邻居
-                const top = 3;
+
                 // 根据邻居改变概率
-                base[left] += x / 100;
-                base[top] += y / 100;
-                if (left === top) {
-                    base[left] += z / 100;
+                // 1. 左、上邻居相同
+                if (left != null && top != null && left === top) {
+                    base[left] += (x + y + z) / 100;
+                    base[left] = formatBase(base[left]);
+                    // 剩余概率
+                    const remain = (1 - base[left]) / 4;
+                    base = base.map((e, _i) => (_i !== left ? remain : e));
+                } else {
+                    // 2. 左、上邻居不同
+                    let changeSum = 0;
+                    if (left !== null) {
+                        base[left] += x / 100;
+                        base[left] = formatBase(base[left]);
+                        changeSum += base[left];
+                    }
+                    if (top !== null) {
+                        base[top] += y / 100;
+                        base[top] = formatBase(base[top]);
+                        changeSum += base[top];
+                    }
+                    // 剩余概率
+                    changeSum = formatBase(changeSum);
+                    const remain = (1 - changeSum) / 3;
+                    base = base.map((e, _i) => (_i !== left && _i !== top ? remain : e));
                 }
-                // 归一化
                 const total = base.reduce((a, b) => a + b, 0);
                 base = base.map(e => e / total);
-                const sum = base.reduce((a, b) => a + b, 0);
-                console.log(sum);
-                if (Math.abs(sum - 1) < 1e-6) {
-                    console.error('概率归一化成功');
-                } else {
-                    console.log('概率归一化失败');
-                }
+                console.log(`left:${left}`, `top:${top}`, `x:${x}`, `y:${y}`, `z:${z}`, `概率: ${base.join(',')}`);
+
+                console.assert(base.join(',') === expect, '概率归一化失败');
             }
             test();
         </script>
